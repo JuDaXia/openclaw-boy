@@ -281,20 +281,20 @@ def gateway_start():
             log("Install requires admin, falling back to direct process mode...")
             rc, out, err = _start_direct()
             if rc == 0:
-                show_notification("OpenClaw Gateway", "Gateway started (direct mode)")
+                show_notification("OpenClaw Gateway", "Gateway 已启动")
                 return 0, out, err
             else:
-                show_notification("OpenClaw Gateway", "Failed to start gateway")
+                show_notification("OpenClaw Gateway", "Gateway 启动失败")
                 return -1, out, err
         else:
             log(f"Install failed: {err2}")
-            show_notification("OpenClaw Gateway", "Install failed, check debug log")
+            show_notification("OpenClaw Gateway", "安装失败，请查看调试日志")
             return rc2, out2, err2
 
     if rc == 0 and not _service_missing(out):
-        show_notification("OpenClaw Gateway", "Gateway started successfully")
+        show_notification("OpenClaw Gateway", "Gateway 已启动")
     else:
-        show_notification("OpenClaw Gateway", "Failed to start gateway")
+        show_notification("OpenClaw Gateway", "Gateway 启动失败")
         rc = -1
     return rc, out, err
 
@@ -304,7 +304,7 @@ def gateway_stop():
     # Also kill port in case of zombie
     if is_gateway_running():
         kill_port()
-    show_notification("OpenClaw Gateway", "Gateway stopped")
+    show_notification("OpenClaw Gateway", "Gateway 已停止")
     return 0, out, err
 
 def gateway_restart():
@@ -346,22 +346,22 @@ class OpenClawTray:
             icon=ICON_RED,
             title="OpenClaw Gateway",
             menu=pystray.Menu(
-                pystray.MenuItem("Open Panel", self.show_panel, default=True),
+                pystray.MenuItem("打开控制面板", self.show_panel, default=True),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Start Gateway",   self.action_start),
-                pystray.MenuItem("Stop Gateway",    self.action_stop),
-                pystray.MenuItem("Restart Gateway", self.action_restart),
+                pystray.MenuItem("启动 Gateway",   self.action_start),
+                pystray.MenuItem("停止 Gateway",   self.action_stop),
+                pystray.MenuItem("重启 Gateway",   self.action_restart),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Open Web UI",     self.action_open_web),
-                pystray.MenuItem("View Debug Log",  self.action_show_log),
+                pystray.MenuItem("打开网页控制台", self.action_open_web),
+                pystray.MenuItem("查看调试日志",   self.action_show_log),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem(
-                    "Auto-start on Boot",
+                    "开机自动启动",
                     self.action_toggle_autostart,
                     checked=lambda item: is_autostart_enabled()
                 ),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Exit",            self.action_exit),
+                pystray.MenuItem("退出",           self.action_exit),
             )
         )
 
@@ -387,13 +387,13 @@ class OpenClawTray:
     def _update_tray_icon(self):
         if self.busy:
             self.tray.icon  = ICON_YELLOW
-            self.tray.title = "OpenClaw Gateway - Working..."
+            self.tray.title = "OpenClaw Gateway - 处理中..."
         elif self.status:
             self.tray.icon  = ICON_GREEN
-            self.tray.title = "OpenClaw Gateway - Running"
+            self.tray.title = "OpenClaw Gateway - 运行中"
         else:
             self.tray.icon  = ICON_RED
-            self.tray.title = "OpenClaw Gateway - Stopped"
+            self.tray.title = "OpenClaw Gateway - 已停止"
 
     # ── Panel window ──────────────────────────────────────────
     def show_panel(self, icon=None, item=None):
@@ -407,7 +407,7 @@ class OpenClawTray:
     def _build_panel(self):
         win = tk.Tk()
         self.panel = win
-        win.title("OpenClaw Gateway")
+        win.title("OpenClaw Gateway 控制面板")
         win.resizable(False, False)
         win.attributes("-topmost", True)
 
@@ -443,12 +443,12 @@ class OpenClawTray:
         status_frame = tk.Frame(win, bg=BG, pady=16)
         status_frame.pack(fill="x", padx=20)
 
-        tk.Label(status_frame, text="STATUS",
+        tk.Label(status_frame, text="当前状态",
                  font=tkfont.Font(family="Segoe UI", size=8),
                  bg=BG, fg=MUTED).pack(anchor="w")
 
         self._status_label = tk.Label(
-            status_frame, text="Checking...",
+            status_frame, text="检测中...",
             font=status_font, bg=BG, fg=YELLOW
         )
         self._status_label.pack(anchor="w")
@@ -472,9 +472,9 @@ class OpenClawTray:
         row1 = tk.Frame(btn_frame, bg=BG)
         row1.pack(fill="x", pady=(0, 6))
 
-        self._btn_start   = make_btn(row1, "▶  Start",   self.action_start,   "#27ae60", "white")
-        self._btn_stop    = make_btn(row1, "■  Stop",    self.action_stop,    "#c0392b", "white")
-        self._btn_restart = make_btn(row1, "↺  Restart", self.action_restart, "#2980b9", "white")
+        self._btn_start   = make_btn(row1, "▶  启动",   self.action_start,   "#27ae60", "white")
+        self._btn_stop    = make_btn(row1, "■  停止",   self.action_stop,    "#c0392b", "white")
+        self._btn_restart = make_btn(row1, "↺  重启",   self.action_restart, "#2980b9", "white")
 
         self._btn_start.pack(  side="left", expand=True, fill="x", padx=(0,4))
         self._btn_stop.pack(   side="left", expand=True, fill="x", padx=(0,4))
@@ -483,12 +483,12 @@ class OpenClawTray:
         row2 = tk.Frame(btn_frame, bg=BG)
         row2.pack(fill="x", pady=(0, 6))
 
-        make_btn(row2, "🌐  Open Web UI", self.action_open_web,
+        make_btn(row2, "🌐  打开网页控制台", self.action_open_web,
                  ACCENT, "white").pack(fill="x")
 
         row3 = tk.Frame(btn_frame, bg=BG)
         row3.pack(fill="x", pady=(0, 6))
-        make_btn(row3, "📋  View Debug Log", self.action_show_log,
+        make_btn(row3, "📋  查看调试日志", self.action_show_log,
                  "#2c3e50", MUTED).pack(fill="x")
 
         # Auto-start checkbox
@@ -498,7 +498,7 @@ class OpenClawTray:
         self._autostart_var = tk.BooleanVar(value=is_autostart_enabled())
         autostart_check = tk.Checkbutton(
             autostart_frame,
-            text="  Start with Windows",
+            text="  开机自动启动",
             variable=self._autostart_var,
             command=self._toggle_autostart_from_panel,
             font=label_font,
@@ -536,11 +536,11 @@ class OpenClawTray:
             return
 
         if self.busy:
-            color, text = "#f39c12", "Working..."
+            color, text = "#f39c12", "处理中..."
         elif self.status:
-            color, text = "#2ecc71", "● Running"
+            color, text = "#2ecc71", "● 运行中"
         else:
-            color, text = "#e74c3c", "● Stopped"
+            color, text = "#e74c3c", "● 已停止"
 
         def _update():
             try:
@@ -562,7 +562,7 @@ class OpenClawTray:
     def _run_action(self, label, fn):
         """Run a gateway action in a background thread."""
         if self.busy:
-            self._set_msg("Another operation is in progress...")
+            self._set_msg("有操作正在进行中，请稍候...")
             return
         self.busy = True
         self._update_tray_icon()
@@ -580,10 +580,10 @@ class OpenClawTray:
                 self._update_panel_status()
 
                 if rc == 0:
-                    msg = f"✓ {label} completed successfully"
+                    msg = f"✓ {label}成功"
                 else:
-                    error_detail = err.strip()[:100] if err.strip() else f"Exit code {rc}"
-                    msg = f"✗ {label} failed: {error_detail}"
+                    error_detail = err.strip()[:100] if err.strip() else f"错误码 {rc}"
+                    msg = f"✗ {label}失败：{error_detail}"
                     log(f"ERROR: {label} failed with code {rc}")
                     log(f"STDERR: {err}")
 
@@ -593,7 +593,7 @@ class OpenClawTray:
             except Exception as e:
                 log(f"Exception in action: {e}")
                 self.busy = False
-                self._set_msg(f"✗ {label} error: {str(e)}")
+                self._set_msg(f"✗ {label}异常：{str(e)}")
                 self._enable_buttons()
                 self._refresh_status()
 
@@ -623,9 +623,9 @@ class OpenClawTray:
         except Exception:
             pass
 
-    def action_start(self,   icon=None, item=None): self._run_action("Start",   gateway_start)
-    def action_stop(self,    icon=None, item=None): self._run_action("Stop",    gateway_stop)
-    def action_restart(self, icon=None, item=None): self._run_action("Restart", gateway_restart)
+    def action_start(self,   icon=None, item=None): self._run_action("启动", gateway_start)
+    def action_stop(self,    icon=None, item=None): self._run_action("停止", gateway_stop)
+    def action_restart(self, icon=None, item=None): self._run_action("重启", gateway_restart)
 
     def action_open_web(self, icon=None, item=None):
         webbrowser.open(WEB_UI_URL)
@@ -633,7 +633,7 @@ class OpenClawTray:
     def action_show_log(self, icon=None, item=None):
         """Open a window showing the debug log."""
         win = tk.Toplevel(self.panel) if (self.panel and self.panel.winfo_exists()) else tk.Tk()
-        win.title("OpenClaw Debug Log")
+        win.title("OpenClaw 调试日志")
         win.geometry("620x400")
         win.configure(bg="#0d0d0d")
 
@@ -656,10 +656,10 @@ class OpenClawTray:
 
         bf = tk.Frame(win, bg="#0d0d0d")
         bf.pack(fill="x", padx=8, pady=(0, 8))
-        tk.Button(bf, text="Refresh", command=refresh,
+        tk.Button(bf, text="刷新", command=refresh,
                   bg="#1a1a2e", fg="#eaeaea", relief="flat",
                   padx=12, pady=4).pack(side="left")
-        tk.Button(bf, text="Close", command=win.destroy,
+        tk.Button(bf, text="关闭", command=win.destroy,
                   bg="#1a1a2e", fg="#eaeaea", relief="flat",
                   padx=12, pady=4).pack(side="right")
 
@@ -667,14 +667,14 @@ class OpenClawTray:
         """Toggle auto-start from tray menu."""
         if is_autostart_enabled():
             if disable_autostart():
-                show_notification("OpenClaw Gateway", "Auto-start disabled")
+                show_notification("OpenClaw Gateway", "已关闭开机自动启动")
             else:
-                show_notification("OpenClaw Gateway", "Failed to disable auto-start")
+                show_notification("OpenClaw Gateway", "关闭开机自动启动失败")
         else:
             if enable_autostart():
-                show_notification("OpenClaw Gateway", "Auto-start enabled")
+                show_notification("OpenClaw Gateway", "已开启开机自动启动")
             else:
-                show_notification("OpenClaw Gateway", "Failed to enable auto-start")
+                show_notification("OpenClaw Gateway", "开启开机自动启动失败")
 
     def _toggle_autostart_from_panel(self):
         """Toggle auto-start from panel checkbox."""
@@ -682,15 +682,15 @@ class OpenClawTray:
         if enabled:
             if not enable_autostart():
                 self._autostart_var.set(False)
-                self._set_msg("✗ Failed to enable auto-start")
+                self._set_msg("✗ 开启开机自动启动失败")
             else:
-                self._set_msg("✓ Auto-start enabled")
+                self._set_msg("✓ 已开启开机自动启动")
         else:
             if not disable_autostart():
                 self._autostart_var.set(True)
-                self._set_msg("✗ Failed to disable auto-start")
+                self._set_msg("✗ 关闭开机自动启动失败")
             else:
-                self._set_msg("✓ Auto-start disabled")
+                self._set_msg("✓ 已关闭开机自动启动")
 
     def action_exit(self, icon=None, item=None):
         self.running = False
