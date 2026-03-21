@@ -1,5 +1,5 @@
 """
-OpenClaw Gateway Tray Tool
+OpenClaw-Boy Tray Tool
 - System tray icon with green/red status
 - Popup panel: Start / Stop / Restart / Open Web UI
 - Auto-start on Windows boot (optional)
@@ -71,7 +71,7 @@ log(f"openclaw executable: {OPENCLAW_CMD}")
 
 # ── Auto-start management ─────────────────────────────────────
 REGISTRY_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-APP_NAME = "OpenClawGateway"
+APP_NAME = "OpenClawBoy"
 
 def is_autostart_enabled():
     """Check if auto-start is enabled in registry."""
@@ -125,7 +125,7 @@ def show_notification(title, message, icon_path=None):
         return
     try:
         toast = Notification(
-            app_id="OpenClaw Gateway",
+            app_id="OpenClaw-Boy",
             title=title,
             msg=message,
             duration="short"
@@ -281,20 +281,20 @@ def gateway_start():
             log("Install requires admin, falling back to direct process mode...")
             rc, out, err = _start_direct()
             if rc == 0:
-                show_notification("OpenClaw Gateway", "Gateway 已启动")
+                show_notification("OpenClaw-Boy", "Gateway 已启动")
                 return 0, out, err
             else:
-                show_notification("OpenClaw Gateway", "Gateway 启动失败")
+                show_notification("OpenClaw-Boy", "Gateway 启动失败")
                 return -1, out, err
         else:
             log(f"Install failed: {err2}")
-            show_notification("OpenClaw Gateway", "安装失败，请查看调试日志")
+            show_notification("OpenClaw-Boy", "安装失败，请查看调试日志")
             return rc2, out2, err2
 
     if rc == 0 and not _service_missing(out):
-        show_notification("OpenClaw Gateway", "Gateway 已启动")
+        show_notification("OpenClaw-Boy", "Gateway 已启动")
     else:
-        show_notification("OpenClaw Gateway", "Gateway 启动失败")
+        show_notification("OpenClaw-Boy", "Gateway 启动失败")
         rc = -1
     return rc, out, err
 
@@ -304,7 +304,7 @@ def gateway_stop():
     # Also kill port in case of zombie
     if is_gateway_running():
         kill_port()
-    show_notification("OpenClaw Gateway", "Gateway 已停止")
+    show_notification("OpenClaw-Boy", "Gateway 已停止")
     return 0, out, err
 
 def gateway_restart():
@@ -342,9 +342,9 @@ class OpenClawTray:
 
         # Build tray icon
         self.tray = pystray.Icon(
-            name="OpenClaw Gateway",
+            name="OpenClaw-Boy",
             icon=ICON_RED,
-            title="OpenClaw Gateway",
+            title="OpenClaw-Boy",
             menu=pystray.Menu(
                 pystray.MenuItem("打开控制面板", self.show_panel, default=True),
                 pystray.Menu.SEPARATOR,
@@ -387,13 +387,13 @@ class OpenClawTray:
     def _update_tray_icon(self):
         if self.busy:
             self.tray.icon  = ICON_YELLOW
-            self.tray.title = "OpenClaw Gateway - 处理中..."
+            self.tray.title = "OpenClaw-Boy - 处理中..."
         elif self.status:
             self.tray.icon  = ICON_GREEN
-            self.tray.title = "OpenClaw Gateway - 运行中"
+            self.tray.title = "OpenClaw-Boy - 运行中"
         else:
             self.tray.icon  = ICON_RED
-            self.tray.title = "OpenClaw Gateway - 已停止"
+            self.tray.title = "OpenClaw-Boy - 已停止"
 
     # ── Panel window ──────────────────────────────────────────
     def show_panel(self, icon=None, item=None):
@@ -412,7 +412,7 @@ class OpenClawTray:
     def _build_panel(self):
         win = tk.Tk()
         self.panel = win
-        win.title("OpenClaw Gateway 控制面板")
+        win.title("OpenClaw-Boy 控制面板")
         win.resizable(False, False)
         win.attributes("-topmost", True)
 
@@ -438,7 +438,7 @@ class OpenClawTray:
         header = tk.Frame(win, bg=SURFACE, pady=12)
         header.pack(fill="x")
 
-        tk.Label(header, text="🦞  OpenClaw Gateway",
+        tk.Label(header, text="🦞  OpenClaw-Boy",
                  font=title_font, bg=SURFACE, fg=FG).pack()
 
         tk.Label(header, text=f"ws://{GATEWAY_HOST}:{GATEWAY_PORT}",
@@ -641,7 +641,7 @@ class OpenClawTray:
     def action_show_log(self, icon=None, item=None):
         """Open a window showing the debug log."""
         win = tk.Toplevel(self.panel) if (self.panel and self.panel.winfo_exists()) else tk.Tk()
-        win.title("OpenClaw 调试日志")
+        win.title("OpenClaw-Boy 调试日志")
         win.geometry("620x400")
         win.configure(bg="#0d0d0d")
 
@@ -675,14 +675,14 @@ class OpenClawTray:
         """Toggle auto-start from tray menu."""
         if is_autostart_enabled():
             if disable_autostart():
-                show_notification("OpenClaw Gateway", "已关闭开机自动启动")
+                show_notification("OpenClaw-Boy", "已关闭开机自动启动")
             else:
-                show_notification("OpenClaw Gateway", "关闭开机自动启动失败")
+                show_notification("OpenClaw-Boy", "关闭开机自动启动失败")
         else:
             if enable_autostart():
-                show_notification("OpenClaw Gateway", "已开启开机自动启动")
+                show_notification("OpenClaw-Boy", "已开启开机自动启动")
             else:
-                show_notification("OpenClaw Gateway", "开启开机自动启动失败")
+                show_notification("OpenClaw-Boy", "开启开机自动启动失败")
 
     def _toggle_autostart_from_panel(self):
         """Toggle auto-start from panel checkbox."""
@@ -702,12 +702,21 @@ class OpenClawTray:
 
     def action_exit(self, icon=None, item=None):
         self.running = False
+        # Force exit after 2s no matter what (safety net)
+        threading.Thread(target=lambda: (time.sleep(2), os._exit(0)), daemon=True).start()
+        # Clean up panel
         if self.panel:
             try:
                 self.panel.destroy()
             except Exception:
                 pass
-        self.tray.stop()
+        # Hide tray icon then stop
+        try:
+            self.tray.visible = False
+            self.tray.stop()
+        except Exception:
+            pass
+        os._exit(0)
 
     def run(self):
         self.tray.run()
