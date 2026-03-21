@@ -2,6 +2,10 @@
 
 OpenClaw Gateway 图形化管理工具。无需输入命令行，双击即可管理 OpenClaw Gateway 服务。
 
+<p align="center">
+  <img src="screenshot.png" alt="OpenClaw-Boy 控制面板" width="400">
+</p>
+
 ## 功能
 
 - **系统托盘图标** — 实时显示 Gateway 状态（🟢运行中 🔴已停止 🟡处理中）
