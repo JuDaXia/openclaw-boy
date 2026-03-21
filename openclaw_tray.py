@@ -397,12 +397,17 @@ class OpenClawTray:
 
     # ── Panel window ──────────────────────────────────────────
     def show_panel(self, icon=None, item=None):
-        """Open or bring the panel to front."""
-        if self.panel and self.panel.winfo_exists():
-            self.panel.lift()
-            self.panel.focus_force()
-            return
-        self._build_panel()
+        """Open or bring the panel to front (runs in its own thread)."""
+        if self.panel:
+            try:
+                if self.panel.winfo_exists():
+                    self.panel.after(0, self.panel.deiconify)
+                    self.panel.after(0, self.panel.lift)
+                    self.panel.after(0, self.panel.focus_force)
+                    return
+            except Exception:
+                pass
+        threading.Thread(target=self._build_panel, daemon=True).start()
 
     def _build_panel(self):
         win = tk.Tk()
@@ -523,8 +528,11 @@ class OpenClawTray:
         # Initial status update
         self._update_panel_status()
 
-        win.protocol("WM_DELETE_WINDOW", win.destroy)
+        # X button hides the window instead of destroying it
+        # so it can be re-shown from the tray without rebuilding
+        win.protocol("WM_DELETE_WINDOW", win.withdraw)
         win.mainloop()
+        self.panel = None
 
     def _update_panel_status(self):
         if not self.panel:
