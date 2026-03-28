@@ -138,13 +138,14 @@ def show_notification(title, message, icon_path=None):
         log(f"Failed to show notification: {e}")
 
 # ── Gateway control ───────────────────────────────────────────
-def run_cmd(args, timeout=30):
+def run_cmd(args, timeout=60):
     """Run a command, return (returncode, stdout, stderr)."""
     try:
-        if OPENCLAW_CMD.endswith(".ps1"):
+        cmd_lower = OPENCLAW_CMD.lower()
+        if cmd_lower.endswith(".ps1"):
             full_args = ["powershell", "-ExecutionPolicy", "Bypass",
                          "-File", OPENCLAW_CMD] + args
-        elif OPENCLAW_CMD.endswith(".cmd") or OPENCLAW_CMD.endswith(".bat"):
+        elif cmd_lower.endswith(".cmd") or cmd_lower.endswith(".bat"):
             full_args = ["cmd", "/c", OPENCLAW_CMD] + args
         else:
             full_args = [OPENCLAW_CMD] + args
@@ -195,9 +196,10 @@ def _access_denied(stderr):
 _direct_proc = None   # subprocess.Popen handle
 
 def _build_openclaw_args(args):
-    if OPENCLAW_CMD.endswith(".ps1"):
+    cmd_lower = OPENCLAW_CMD.lower()
+    if cmd_lower.endswith(".ps1"):
         return ["powershell", "-ExecutionPolicy", "Bypass", "-File", OPENCLAW_CMD] + args
-    elif OPENCLAW_CMD.endswith(".cmd") or OPENCLAW_CMD.endswith(".bat"):
+    elif cmd_lower.endswith(".cmd") or cmd_lower.endswith(".bat"):
         return ["cmd", "/c", OPENCLAW_CMD] + args
     return [OPENCLAW_CMD] + args
 
@@ -229,7 +231,7 @@ def _start_direct():
     global _direct_proc
     _stop_direct()
     try:
-        args = _build_openclaw_args(["gateway"])
+        args = _build_openclaw_args(["gateway", "run"])
         log(f"Starting direct process: {' '.join(args)}")
         _direct_proc = subprocess.Popen(
             args,
@@ -238,14 +240,14 @@ def _start_direct():
             creationflags=subprocess.CREATE_NO_WINDOW
         )
         log(f"Direct process PID: {_direct_proc.pid}")
-        # Wait up to 8s for port to open
-        for _ in range(8):
-            time.sleep(1)
+        # Wait up to 30s for port to open
+        for _ in range(15):
+            time.sleep(2)
             if is_gateway_running():
                 log("Direct process: gateway is up")
                 return 0, "", ""
         log("Direct process: gateway did not start in time")
-        return -1, "", "Gateway did not start within 8 seconds"
+        return -1, "", "Gateway did not start within 30 seconds"
     except Exception as e:
         log(f"Direct start error: {e}")
         return -1, "", str(e)
@@ -263,55 +265,40 @@ def _stop_direct():
         _direct_proc = None
 
 def gateway_start():
+    """Start gateway — always use direct process mode for reliability."""
     global _direct_proc
-    # First try the official start command
-    rc, out, err = run_cmd(["gateway", "start"])
 
-    # Service not installed — try to install
-    if rc == 0 and _service_missing(out):
-        log("Service missing, trying install...")
-        rc2, out2, err2 = run_cmd(["gateway", "install"], timeout=60)
+    # If already running, nothing to do
+    if is_gateway_running():
+        log("Gateway already running")
+        show_notification("OpenClaw-Boy", "Gateway 已经在运行中")
+        return 0, "", ""
 
-        if rc2 == 0:
-            # Install succeeded, retry start
-            log("Install succeeded, retrying start...")
-            rc, out, err = run_cmd(["gateway", "start"])
-        elif _access_denied(err2):
-            # No admin rights — fall back to direct process
-            log("Install requires admin, falling back to direct process mode...")
-            rc, out, err = _start_direct()
-            if rc == 0:
-                show_notification("OpenClaw-Boy", "Gateway 已启动")
-                return 0, out, err
-            else:
-                show_notification("OpenClaw-Boy", "Gateway 启动失败")
-                return -1, out, err
-        else:
-            log(f"Install failed: {err2}")
-            show_notification("OpenClaw-Boy", "安装失败，请查看调试日志")
-            return rc2, out2, err2
-
-    if rc == 0 and not _service_missing(out):
+    # Use direct process mode: openclaw gateway (foreground, managed by us)
+    log("Starting gateway via direct process...")
+    rc, out, err = _start_direct()
+    if rc == 0:
         show_notification("OpenClaw-Boy", "Gateway 已启动")
     else:
         show_notification("OpenClaw-Boy", "Gateway 启动失败")
-        rc = -1
     return rc, out, err
 
 def gateway_stop():
+    """Stop gateway — stop our direct process and kill any remaining."""
     _stop_direct()
-    rc, out, err = run_cmd(["gateway", "stop"])
-    # Also kill port in case of zombie
+    # Also try the official stop in case it was started by schtasks
+    run_cmd(["gateway", "stop"], timeout=30)
+    # Force kill port if still occupied
     if is_gateway_running():
         kill_port()
     show_notification("OpenClaw-Boy", "Gateway 已停止")
-    return 0, out, err
+    return 0, "", ""
 
 def gateway_restart():
-    """Stop everything, clean up port, then start fresh."""
+    """Stop everything, clean up, then start fresh."""
     log("Restart: stopping...")
     _stop_direct()
-    run_cmd(["gateway", "stop"], timeout=15)
+    run_cmd(["gateway", "stop"], timeout=30)
     time.sleep(1)
     if is_gateway_running():
         log("Port still occupied, force-killing...")
@@ -581,14 +568,31 @@ class OpenClawTray:
         def _work():
             try:
                 rc, out, err = fn()
-                time.sleep(2)
+
+                # After start/restart, poll up to 30s for port to come up
+                if rc == 0 and label in ("启动", "重启"):
+                    self._set_msg(f"{label}命令已执行，等待 Gateway 上线...")
+                    log("Waiting for gateway port to come up...")
+                    for i in range(15):
+                        time.sleep(2)
+                        if is_gateway_running():
+                            log(f"Gateway port up after {(i+1)*2}s")
+                            break
+                    else:
+                        log("Gateway port did not come up within 30s")
+                else:
+                    time.sleep(2)
+
                 self.busy = False
                 self._refresh_status()
                 self._update_tray_icon()
                 self._update_panel_status()
 
-                if rc == 0:
+                if rc == 0 and (label not in ("启动", "重启") or is_gateway_running()):
                     msg = f"✓ {label}成功"
+                elif rc == 0 and not is_gateway_running():
+                    msg = f"⚠ {label}命令已执行，但 Gateway 未在端口 {GATEWAY_PORT} 上线"
+                    log(f"WARNING: command succeeded but port not listening")
                 else:
                     error_detail = err.strip()[:100] if err.strip() else f"错误码 {rc}"
                     msg = f"✗ {label}失败：{error_detail}"
